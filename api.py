@@ -97,10 +97,8 @@ class Rules(Resource):
         for row in _companies:
             _id = row["Company_ID"]
             _rules = {}
-            print('here', _id)
             # Get format, headers and keyword_match
             _format = Rule(_id).get_format()
-            print('here', _format)
             for attr, value in _format.items():
                 _rules[attr] = value
 
