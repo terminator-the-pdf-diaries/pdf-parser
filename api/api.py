@@ -7,6 +7,7 @@ from flask_cors import CORS
 from database import database
 from s3 import upload_file_to_s3
 from config import S3_LOCATION, S3_KEY, S3_SECRET, S3_BUCKET
+from tika import parser
 
 app = Flask(__name__)
 app.config['CORS_HEADERS'] = ['Content-Type']
@@ -46,7 +47,6 @@ class Rule_Helper:
             "*", "Company_Financial_Statement_Format")
         cur.execute(sql)
         result = cur.fetchone()
-        print(result)
         return result
 
     def get_column_headers(self):
@@ -73,7 +73,6 @@ class Rule_Helper:
             """ % (self._company_id)
         cur.execute(sql)
         data_set = cur.fetchall()
-        print(data_set)
         for row in data_set:
             result.append(row["Column_Header_Text"])
         return result
@@ -126,7 +125,8 @@ class Rules(Resource):
                 _rules[attr] = value
 
             _rules["headers"] = Rule_Helper(_id).get_column_headers()
-            _rules["excluded_header"] = Rule_Helper(_id).get_excluded_headers()
+            _rules["excluded_header"] = Rule_Helper(
+                _id).get_excluded_headers()
             _rules["keyword_match"] = Helpers.convert_list_to_dic(
                 Rule_Helper(_id).get_keyword_match())
 
@@ -155,17 +155,65 @@ class Rule(Resource):
         return result
 
 
+class IA_Helper:
+    _code = None
+    _name = None
+
+    def __init__(self, id=None, name=None):
+        self._code = id
+        self._name = name
+
+    def get_code(self):
+        sql = """SELECT IA_Classification_Code FROM IA_Clasification WHERE IA_Classification_Text= %s""" % (
+            self._name)
+        cur.execute(sql)
+        return cur.fetchone()
+
+    def get_name(self):
+        sql = """SELECT IA_Classification_Text FROM IA_Clasification WHERE IA_Classification_Code= %s""" % (
+            self._code)
+        cur.execute(sql)
+        return cur.fetchone()
+
+
+class Transaction(Resource):
+    def get(self, id):
+        result = {}
+        sql = """SELECT IA_Classification_Code, Accounting_Transaction_Amount
+         FROM Calculated_Transaction WHERE Company_ID= %s""" % (id)
+
+        cur.execute(sql)
+        data_set = cur.fetchall()
+
+        for row in data_set:
+            _IA_text = IA_Helper(row["IA_Classification_Code"]).get_name()[
+                'IA_Classification_Text']
+            result[_IA_text] = float(row["Accounting_Transaction_Amount"])
+        return result
+
+
 class Upload(Resource):
     def post(self):
-        # file = request.files.get('file')
         file = request.files["files"]
-        # HACK: Replace with conver data method
-        # Use Tika to parse the PDF
-        #parsedPDF = parser.from_buffer(file.read())
-        #print('pdf', parsedPDF["content"])
 
+        print(self.get_rules(file.filename))
+
+        # Save S3 Link
         output = upload_file_to_s3(file, app.config["S3_BUCKET"])
-        return str(output)
+
+        _id = self.get_company_id(self.get_file_business_unit(file.filename))
+        self.save_s3_link(output, _id)
+
+        # Save Final Transaction
+        # Replace with conver data method
+        # Use Tika to parse the PDF
+        parsedPDF = parser.from_buffer(file.read())
+        print('pdf', parsedPDF["content"])
+        # calculated_data = {"data": "data"}
+        # self.save_final_transaction(calculated_data, _id)
+        calculated_data = Transaction().get(_id)
+        print("calculated", calculated_data)
+        return calculated_data
 
     def options(self):
         resp = Response()
@@ -174,12 +222,44 @@ class Upload(Resource):
         resp.headers['Access-Control-Allow-Methods'] = 'POST'
         return resp
 
+    def get_company_id(self, business_unit):
+        sql = """SELECT Company_ID FROM Company WHERE Business_Unit_Num = %s""" % (
+            business_unit)
+        cur.execute(sql)
+        return cur.fetchone()["Company_ID"]
 
-api.add_resource(Rules, '/api//rules', methods=['GET'])
+    def get_file_business_unit(self, name):
+        return name.split("_")[0]
+
+    def get_rules(self, name):
+        _id = self.get_company_id(self.get_file_business_unit(name))
+        return Rule().get(_id)
+
+    def save_s3_link(self, link, id):
+        sql = """"UPDATE Company SET S3_Link = %s WHERE Company_Id = %s""" % (
+            link, id)
+        cur.execute(sql)
+        cur.commit()
+        return link
+
+    def save_final_transaction(self, calculated_data, id):
+        for row in calculated_data:
+            _code = IA_Helper(row["category"])
+            _amount = row["amount"]
+            sql = """INSERT INTO Calculated_Transaction 
+            (Company_Id, IA_Classification_Code, Accounting_Transaction_Amount) values (%s, %s, %s)""" % (
+                id, _code, _amount)
+            cur.execute(sql)
+            cur.commit
+            ()
+        return calculated_data
+
+
+api.add_resource(Rules, '/api/rules', methods=['GET'])
 api.add_resource(Rule, '/api/rules/<id>',
                  methods=['GET', 'POST', 'DELETE', 'PUT'])
 api.add_resource(Upload, '/api/upload', methods=['POST', 'OPTIONS'])
-
+api.add_resource(Transaction, '/api/transaction/<id>', methods=['GET'])
 
 if __name__ == '__main__':
     app.run(debug=True)
