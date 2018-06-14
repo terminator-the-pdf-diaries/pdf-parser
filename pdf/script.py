@@ -138,22 +138,31 @@ def calc(df):
     #pass
 
 def prep_df(df, col_for_calc, row_for_calc):
+    print('COL FOR CALC')
+    print(col_for_calc)
+    print('ROW FOR CALC')
+    print(row_for_calc)
     print(df)
     
     # filtering df by col
     df = df[col_for_calc]
-    print(df)
+
+    # filtering df by row value in first column
+    col_name = df.columns[0]
+    print('INCLUDED ROWS: ', row_for_calc)
+    print('ROWS BEING FILTERS :', df[col_name])
+
+    # row logical filter
+    print(df[col_name].isin(row_for_calc))
+
+    df = df[df[col_name].isin(row_for_calc)]
 
     # filter df by index value based off of necessary rows for calc
     df.drop(df.index[row_for_calc])
     print(df)
 
-    # filtering df by row value in first column
-    col_name = df.columns[0]
-    df = df[df[col_name].isin(row_for_calc)]
-
-    # first column always discarded in calculation, treat  as index
-    df.set_index(df.columns[0], inplace=True)
+    print('INDEX')
+    print(df.index)
 
     print(df)
     return df
@@ -245,7 +254,7 @@ def col_check(keywords,column):
 
     keep_col = []
     # assume first column header always contain row keywords 
-    keep_col.append(column[0])
+    keep_col.append(new_col[0])
     keep_row = []
     
     # check for keyword in column header
@@ -254,11 +263,13 @@ def col_check(keywords,column):
 
     for key in keyword_list:
         print()
-        print('KEY')
-        print(key)
+        print('KEY ', key)
         if key in new_col:
+            print('KEEP IN COLUMN')
             keep_col.append(key)
-        else: keep_row.append(key)
+        else: 
+            keep_row.append(key)
+            print('KEEP IN ROW')
 
     print('KEEP COL ', keep_col)
     print('KEEP ROW', keep_row)
@@ -268,12 +279,12 @@ def col_check(keywords,column):
 def main():
     # get pdf (input path)
     #input_path = "../pdf-parser/data/Arby/40721_Arby_Bottom_2017-12-31.pdf"
-    input_path = "../pdf-parser/data/TGIFriday/20044_TGI_Friday_Nose danger track_2017-12-31.pdf"
-    #input_path = "../pdf-parser/data/WingStop/51660_WingStop_Farther as numeral_2017-12-31.pdf"
+    #input_path = "../pdf-parser/data/TGIFriday/20044_TGI_Friday_Nose danger track_2017-12-31.pdf"
+    input_path = "../pdf-parser/data/WingStop/51660_WingStop_Farther as numeral_2017-12-31.pdf"
 
     # retrieving json 
     # arby
-    
+    '''
     get_data = {
       "format": {
         "Transpose": 1,
@@ -323,13 +334,17 @@ def main():
     'Asset Transfer',\
     'Ending Balance'],
     "keyword_match": 
-        {"Total Contributions": "Contributions", "Total Distributions": "Ordinary Income",\
-        "Realized Gain/(Loss)": "Unrealized MTM", "Professional Fees": "Realized Gain/Loss",\
+        {"Contributions": "Contributions", "Distributions": "Ordinary Income",\
+        "Realized Gain/(Loss)": "Unrealized MTM", "Realized Gain/Loss Net": "Professional Fees",\
         "Other Expenses": "Distributions", "Change in Unrealized": "Ending Equity Balance"
         }
+        #{"Total Contributions": "Contributions", "Total Distributions": "Ordinary Income",\
+        #"Realized Gain/(Loss)": "Unrealized MTM", "Professional Fees": "Realized Gain/Loss",\
+        #"Other Expenses": "Distributions", "Change in Unrealized": "Ending Equity Balance"
+        #}
 }
 
-    '''
+
     tgi_column = ['Commitment Percentage','Commitment Amount','Beginning Balance','Contributions','Distributions',\
                    'Realized Gains (Losses), Net','Unrealized Gains (Losses), Net','Management Fee, Net','Other Income',\
                   'Other Expense','Transfers','Asset Transfer','Ending Balance']
@@ -347,7 +362,7 @@ def main():
     tgi_df = PDFparser.create_df(pdf_content, TGI.page_pattern, TGI.content_pattern, TGI.column)
     print(tgi_df)
     '''
-    '''
+    
     # windpoint
     get_data = {
     "format": {
@@ -366,7 +381,8 @@ def main():
         "Recall provision receivable",
         "Cumulative distributions",
         "Cumulative gain allocations",
-        "Net gain before Investment gain",
+        # check capitalization: Net gain before Investment gain
+        "Net gain before investment gain",
         "Net gain on investments unrealized",
         "Net gain on investments realized",
         "Distributions",
@@ -380,9 +396,9 @@ def main():
         "Net gain on investments realized": "Realized Gain/Loss",
         "Distributions": "Distributions",
         "Total partners' capital": "Ending Equity Balance",
-        "The Northwestern Mutual Life Insurance Company": "The Northwestern Mutual Life Insurance Company"
+        "The Northwestern Mutual Life Insurance Company": "The Northwestern Mutual Life Insurance Company",
     }
-}'''
+}
 
 
     # initializing pdf object & set parameters
