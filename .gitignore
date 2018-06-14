@@ -102,3 +102,6 @@ ENV/
 
 # Mac
 .DS_Store
+
+# Crypto file
+api/crypto.py
