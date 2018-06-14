@@ -40,7 +40,9 @@ class PDF:
         temp = {}
         for key, val in json.items():
             key = ''.join(e for e in key if e.isalnum())
+            print(key)
             temp[key] = val
+        print(temp)
         return temp
 
     def set_properties(self, json):

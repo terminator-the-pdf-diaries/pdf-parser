@@ -20,11 +20,11 @@ class PDFparser:
             s = '({}).*?({})'
         return s.format(head, end)
 
-    def parse(self, text_string):
+    def parse(self, input_file):
         '''
         Tika library to parse PDF
         '''
-        parsedPDF = parser.from_buffer(text_string)
+        parsedPDF = parser.from_file(input_file)
 
         # Extract the text content from the parsed PDF
         pdf = parsedPDF["content"]
