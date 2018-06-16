@@ -2,7 +2,7 @@ from PDFparser import *
 
 class PDF:
     # PDF object
-    def __init__(self):
+    def __init__(self, json):
         '''
         column: table headers
         pg_head: beginning of page that contains specific table
@@ -13,30 +13,6 @@ class PDF:
         keywords: keywords identify required table fields for calculation
         page_pattern: a pattern that identifies the page needed
         table_pattern: a pattern that identifies the table
-        '''
-        self.column = None
-        self.pg_head = None
-        self.pg_end = None
-        self.table_head = None
-        self.table_end = None
-
-        self.keywords = None # keywords filtered for calculations
-        
-        self.page_pattern = None
-        self.table_pattern = None
-
-    
-    def strip(self, string):
-        '''
-        removes special characters, white space, and capitalization for matching
-        '''
-
-        string = (''.join(e for e in string if e.isalnum())).lower()
-        return string
-
-    def set_properties(self, json):
-        '''
-        sets pdf properties with provided DB fields
         '''
 
         self.pg_head = json['format']['Begin_of_Page_Text']
@@ -59,7 +35,7 @@ class PDF:
 
         # build column header
         raw_column = json['headers']
-        column = [self.strip(c) for c in raw_column]
+        column = [PDF.strip(c) for c in raw_column]
 
         self.column = column
 
@@ -68,6 +44,16 @@ class PDF:
         
         self.table_pattern = PDFparser().gen_regex(self.table_head, self.table_end, True)
         print('TABLE PATTERN: ', self.table_pattern)
+        print()
+
+    @staticmethod
+    def strip(string):
+        '''
+        removes special characters, white space, and capitalization for matching
+        '''
+
+        string = (''.join(e for e in string if e.isalnum())).lower()
+        return string
 
 if __name__ == "__main__":
     pass

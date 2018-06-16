@@ -7,13 +7,14 @@
 #
 ##=========================================
 
+#import PDFparser
 from PDFparser import *
 from pdf import PDF
 
 def calc(df):
     '''
     perform calculation based off of specified calculation rules
-    currently just sums
+    currently just sums all rows
 
     TO BE IMPLEMENTED:
     calculation rules
@@ -22,21 +23,13 @@ def calc(df):
     # shape filter
     # n x 1 = sum by column
     # 1 x n = sum by row
-
-    
-    # changing column to float dtype for calculation
-    # types must be set in by parser - to be implemented
-
-    cols = df.columns
-    print(cols)
-    df[cols] = df[cols].apply(pd.to_numeric, errors='coerce')
     
     print(df.shape)
     print()
+
     # n x 1
     if (df.shape[0] > 1 and df.shape[1] == 1):
         print('DF IS: SERIES SHAPE')
-        print(df)
 
         # adding calculated value to df
         df.loc['calculated_result'] = df.sum()
@@ -44,7 +37,6 @@ def calc(df):
     # 1 x n
     elif (df.shape[0] == 1 and df.shape[1] > 1):
         print('DF IS: ARRAY SHAPE')
-        print(df)
 
         df['calculated_result'] = df[df.columns].sum(axis=1)
 
@@ -54,6 +46,7 @@ def calc(df):
     print()
     print('END RESULT')
     print(df)
+    print()
     return df
 
 def prep_df(df, col_for_calc, row_for_calc):
@@ -95,26 +88,6 @@ def prep_df(df, col_for_calc, row_for_calc):
 
     return df
 
-def rename(col, keywords, generated):
-    '''
-    dataframe formatting for end result to be sent to JDE
-    '''
-
-    new_col = []
-    for c in col:
-        print('old col name: {}'.format(c))
-        if c in keywords:
-            c = keywords[c]
-            print('new col name: {}'.format(c))
-            new_col.append(c)    
-        elif c in generated:
-            new_col.append(c)
-    return new_col
-
-
-def retrieve():
-    pass
-
 def col_check(keywords,col):
     '''
     checks and assigns row/col category to keywords
@@ -127,7 +100,7 @@ def col_check(keywords,col):
     print('COLUMN HEADER: ', col)
     print()
 
-    row_keywords = [key for key in list(keywords.keys()) if key not in col]
+    row_keywords = [key for key in keyword_list if key not in col]
     print('ROW KEYWORDS :', row_keywords)
     print()
 
@@ -143,17 +116,63 @@ def col_check(keywords,col):
 
     return (col_keywords, row_keywords)
 
+def rename(strings, keywords):
+    '''
+    dataframe formatting for end result to be sent to JDE
+    renames strings to keyword values in PDF properties
+    '''
+
+    new_strings = []
+    for c in strings:
+        print('old col name: {}'.format(c))
+        if c in keywords:
+            c = keywords[c]
+            print('new col name: {}'.format(c))
+            print()
+            new_strings.append(c)    
+        else:
+            new_strings.append(c)
+    return new_strings
+
+def send(df):
+    '''
+    send to DB in JSON format
+    '''
+    print(df.to_dict('records'))
+    
+
+def process_df(pdf_object, df):
+    print(df.dtypes)
+    print()
+
+    col_keywords, row_keywords = col_check(pdf_object.keywords, pdf_object.column)
+    
+    # prep df for calculation (removing columns unecessary for calculation)
+    df = prep_df(df, col_keywords, row_keywords)
+    df = calc(df)
+
+    print('DF INDEX: ', df.index)
+    print('DF COLUMNS: ', df.columns)
+    print()
+
+    # renaming to match IA classification before sending to DB
+    df.index = rename(df.index, pdf_object.keywords)
+    df.columns = rename(df.columns, pdf_object.keywords)
+    df['IA_Classification'] = df.index
+    df.index = pd.RangeIndex(len(df.index))
+
+    print(df)
+    send(df)
 
 def process_pdf(input_path, db_feed):
     '''
-    kicks off script process
+    kicks off pdf processing
     db_feed - pdf json from db
     input_path - path to pdf
     '''
 
     # initializing pdf object & set parameters
-    pdf_object = PDF()
-    pdf_object.set_properties(db_feed)
+    pdf_object = PDF(db_feed)
     
     # parsing pdf - input path (?)
     pdf_content = PDFparser().parse(input_path)
@@ -161,22 +180,19 @@ def process_pdf(input_path, db_feed):
     # building dataframe
     df = PDFparser().create_df(pdf_content, pdf_object.page_pattern, pdf_object.table_pattern, pdf_object.column)
     
-    print(df.dtypes)
-
-    col_keywords, row_keywords = col_check(pdf_object.keywords, pdf_object.column)
-    
-    # prep df for calculation (removing columns unecessary for calculation)
-    df = prep_df(df, col_keywords, row_keywords)
-
-    calc(df)
+    # continue df transformation & filtering only if parsing success 
+    if (df is not None):
+        process_df(pdf_object, df)
+    else:
+        print('no dataframe passed')
 
 def main():
 
-    #input_path = "./data/Arby/40721_Arby_Bottom_2017-12-31.pdf"
-    #input_path = "./data/TGIFriday/20044_TGI_Friday_Nose danger track_2017-12-31.pdf"
+    #input_path = "./data/Arby/46286_Arby_Fed_2017-12-31.pdf"
+    input_path = "./data/TGIFriday/20044_TGI_Friday_Nose danger track_2017-12-31.pdf"
     
     # use 65008 for updated wingstop format
-    input_path = "./data/WingStop/65008_WingStop_Half here talk_2017-12-31.pdf"
+    #input_path = "./data/WingStop/65008_WingStop_Half here talk_2017-12-31.pdf"
 
     #=================
     #      ARBY
@@ -184,7 +200,6 @@ def main():
 
     arby_feed = {
       "format": {
-        "Transpose": 1,
         "Begin_of_Page_Text": "For the Year",
         "Begin_of_Table_Text": "Opening Equity",
         "Company_ID": 1,
@@ -192,7 +207,6 @@ def main():
         "End_of_Table_Text": "Remaining Commitment"
       },
       "headers": ["Category","Total Fund","Investor's Allocation"],
-      "excluded_headers": ["Total Fund"],
       "keyword_match": 
         {"Total Contributions": "Contributions",\
         "Total Distributions": "Distributions",\
@@ -203,7 +217,10 @@ def main():
         "Idle Funds Interest Income": "Ordinary Income",\
         "Equity Transfer": "Ordinary Income",\
         "Closing Equity": "Ending Equity Balance",\
-        "Investor's Allocation": "Allocation"}
+        "Investor's Allocation": "Allocation"},
+        "calculation_rules": {
+            'TBD':''
+        }
     } 
     
     #=================
@@ -211,9 +228,7 @@ def main():
     #=================
 
     tgi_feed = {
-    "excluded_headers": [],
     "format": {
-        "Transpose": 1,
         "Begin_of_Page_Text": "Inception to Date",
         "Begin_of_Table_Text": "Total",
         "Company_ID": 2,
@@ -256,7 +271,6 @@ def main():
         "End_of_Page_Text": "CONFIDENTIAL & PROPRIETARY",
         "End_of_Table_Text": "CONFIDENTIAL & PROPRIETARY",
         "Begin_of_Table_Text": "The Northwestern Mutual Life I",
-        "Transpose": 0
     },
     "headers": [
         "Company Name",
@@ -266,14 +280,11 @@ def main():
         "Recall provision receivable",
         "Cumulative distributions",
         "Cumulative gain allocations",
-        # check capitalization: Net gain before Investment gain
         "Net gain before investment gain",
         "Net gain on investments unrealized",
         "Net gain on investments realized",
         "Distributions",
-        "Total partners' capital"
-    ],
-    "excluded_headers": [],
+        "Total partners' capital"],
     "keyword_match": {
         #"Contributions": "Contributions",
         "Net gain before investment gain": "Ordinary Income",
@@ -282,10 +293,11 @@ def main():
         "Distributions": "Distributions",
         "Total partners' capital": "Ending Equity Balance",
         "The Northwestern Mutual Life Insurance Company": "The Northwestern Mutual Life Insurance Company",
+        }
     }
-}
+
     # pass pdf off to parse & perform calculations
-    process_pdf(input_path, wingstop_feed)
+    process_pdf(input_path, tgi_feed)
 
 if __name__ == "__main__":
     main()
