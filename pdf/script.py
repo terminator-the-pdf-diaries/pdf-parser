@@ -1,78 +1,98 @@
-# import csv
-# import glob
-# import os
-# import sys
+##=========================================
+#   
+# Provide input path and db_feed (json) 
+# to kick off parsing and calculation
+#
+# process_pdf(input_path, db_feed)
+#
+##=========================================
+
 from PDFparser import *
 from pdf import PDF
 
-# perform dataframe calculation, return json 
 def calc(df):
+    '''
+    perform calculation based off of specified calculation rules
+    currently just sums
+
+    TO BE IMPLEMENTED:
+    calculation rules
+    '''
+
     # shape filter
     # n x 1 = sum by column
     # 1 x n = sum by row
 
-    # df.shape = row x col
+    
+    # changing column to float dtype for calculation
+    # types must be set in by parser - to be implemented
 
+    cols = df.columns
+    print(cols)
+    df[cols] = df[cols].apply(pd.to_numeric, errors='coerce')
+    
     print(df.shape)
+    print()
     # n x 1
     if (df.shape[0] > 1 and df.shape[1] == 1):
-        print('SERIES')
-        #df.set_index(df.columns[0], inplace=True)
-
-        # grab the first non categorical column name 
-        calc_col_name = df.columns[0]
-        print(calc_col_name)
-
-        print(df[calc_col_name])
-
-        # changing column to float dtype
-        df[calc_col_name] = df[calc_col_name].astype(float)
+        print('DF IS: SERIES SHAPE')
         print(df)
 
-        df.loc['OrdinaryIncome'] = df.sum()
-
         # adding calculated value to df
-        #df.loc[-1] = ['OrdinaryIncome', 000]
+        df.loc['calculated_result'] = df.sum()
 
     # 1 x n
     elif (df.shape[0] == 1 and df.shape[1] > 1):
-        print('ARRAY')
-        
-        #df['sum'] = df[df.columns].sum(axis=1)
+        print('DF IS: ARRAY SHAPE')
+        print(df)
 
-        # adding calculated value to df
-        #df['OrdinaryIncome'] = # sum
-    
-    #pass
+        df['calculated_result'] = df[df.columns].sum(axis=1)
+
+        # transposing
+        df = df.T
+
+    print()
+    print('END RESULT')
+    print(df)
+    return df
 
 def prep_df(df, col_for_calc, row_for_calc):
-    print('COL FOR CALC')
-    print(col_for_calc)
-    print('ROW FOR CALC')
-    print(row_for_calc)
-    print(df)
+    '''
+    preps dataframe for calculation
+    '''
+
+    print('DF SHAPE BEFORE FILTER: ', df.shape)
     
     # filtering df by col
     df = df[col_for_calc]
+    print('DF SHAPE AFTER FILTER: ', df.shape)
+    print()
 
     # filtering df by row value in first column
     col_name = df.columns[0]
-    print('INCLUDED ROWS: ', row_for_calc)
-    print('ROWS BEING FILTERS :', df[col_name])
+
+    print('KEEP ROWS: ', row_for_calc)
+    print()
+    print('ROWS BEING FILTERED')
+    print()
+    print(df[col_name])
+    print()
 
     # row logical filter
+    row_logical_filter = df[col_name].isin(row_for_calc)
+    print('logical filter RESULT')
     print(df[col_name].isin(row_for_calc))
+    print()
 
-    df = df[df[col_name].isin(row_for_calc)]
+    # remove rows by logical filter
+    df = df[row_logical_filter]
 
-    # filter df by index value based off of necessary rows for calc
-    df.drop(df.index[row_for_calc])
+    print('PREPPED DF: ')
+
+    # setting column[0] as index - assume first column always nonnumerical categories
+    df.set_index(df.columns[0], inplace=True)
     print(df)
 
-    print('INDEX')
-    print(df.index)
-
-    print(df)
     return df
 
 def rename(col, keywords, generated):
@@ -95,58 +115,72 @@ def rename(col, keywords, generated):
 def retrieve():
     pass
 
-def col_check(keywords,column):
-    # strip column head of special characters for keyword matching
-    new_col = []
-    
-    for col in column:
-        col = ''.join(e for e in col if e.isalnum())
-        new_col.append(col)
+def col_check(keywords,col):
+    '''
+    checks and assigns row/col category to keywords
+    '''
 
-    print('OLD COLUMN')
-    print(column)
-    print()
-    print('NEW COLUMN')
-    print(new_col)
-    print()
-    print('KEYWORDS')
-    print(keywords)
-    print()
-
-    keep_col = []
-    # assume first column header always contain row keywords 
-    keep_col.append(new_col[0])
-    keep_row = []
-    
     # check for keyword in column header
     keyword_list = list(keywords.keys())
-    print(keyword_list)
+    print('KEYWORD LIST: ', keyword_list)
+    print()
+    print('COLUMN HEADER: ', col)
+    print()
 
-    for key in keyword_list:
-        print()
-        print('KEY ', key)
-        if key in new_col:
-            print('KEEP IN COLUMN')
-            keep_col.append(key)
-        else: 
-            keep_row.append(key)
-            print('KEEP IN ROW')
+    row_keywords = [key for key in list(keywords.keys()) if key not in col]
+    print('ROW KEYWORDS :', row_keywords)
+    print()
 
-    print('KEEP COL ', keep_col)
-    print('KEEP ROW', keep_row)
+    # set difference between keywords and row keywords
+    # keywords not in row are classified to be column keywords
+    col_keywords = list(set(keyword_list).symmetric_difference(set(row_keywords)))
 
-    return (new_col, keep_col, keep_row)
+    # assume first column header always contains row keyword
+    col_keywords.insert(0, col[0])
+    
+    print('COLUMN KEYWORDS: ', col_keywords)
+    print()
+
+    return (col_keywords, row_keywords)
+
+
+def process_pdf(input_path, db_feed):
+    '''
+    kicks off script process
+    db_feed - pdf json from db
+    input_path - path to pdf
+    '''
+
+    # initializing pdf object & set parameters
+    pdf_object = PDF()
+    pdf_object.set_properties(db_feed)
+    
+    # parsing pdf - input path (?)
+    pdf_content = PDFparser().parse(input_path)
+    
+    # building dataframe
+    df = PDFparser().create_df(pdf_content, pdf_object.page_pattern, pdf_object.table_pattern, pdf_object.column)
+    
+    print(df.dtypes)
+
+    col_keywords, row_keywords = col_check(pdf_object.keywords, pdf_object.column)
+    
+    # prep df for calculation (removing columns unecessary for calculation)
+    df = prep_df(df, col_keywords, row_keywords)
+
+    calc(df)
 
 def main():
-    # get pdf (input path)
-    #input_path = "../pdf-parser/data/Arby/40721_Arby_Bottom_2017-12-31.pdf"
-    #input_path = "../pdf-parser/data/TGIFriday/20044_TGI_Friday_Nose danger track_2017-12-31.pdf"
-    input_path = "../pdf-parser/data/WingStop/51660_WingStop_Farther as numeral_2017-12-31.pdf"
 
-    # retrieving json 
-    # arby
-    '''
-    get_data = {
+    #input_path = "./data/Arby/40721_Arby_Bottom_2017-12-31.pdf"
+    #input_path = "./data/TGIFriday/20044_TGI_Friday_Nose danger track_2017-12-31.pdf"
+    input_path = "./data/WingStop/new_65008_WingStop_Half here talk_2017-12-31.pdf"
+
+    #=================
+    #      ARBY
+    #=================
+
+    arby_feed = {
       "format": {
         "Transpose": 1,
         "Begin_of_Page_Text": "For the Year",
@@ -168,10 +202,13 @@ def main():
         "Equity Transfer": "Ordinary Income",\
         "Closing Equity": "Ending Equity Balance",\
         "Investor's Allocation": "Allocation"}
-    }  
+    } 
     
-    # tgi
-    get_data = {
+    #=================
+    #      TGI
+    #=================
+
+    tgi_feed = {
     "excluded_headers": [],
     "format": {
         "Transpose": 1,
@@ -194,41 +231,26 @@ def main():
     'Transfers',\
     'Asset Transfer',\
     'Ending Balance'],
-    "keyword_match": 
-        {"Contributions": "Contributions", "Distributions": "Ordinary Income",\
-        "Realized Gain/(Loss)": "Unrealized MTM", "Realized Gain/Loss Net": "Professional Fees",\
-        "Other Expenses": "Distributions", "Change in Unrealized": "Ending Equity Balance"
+    "keyword_match": {
+        "Contributions": "Contributions", "Distributions": "Ordinary Income",\
+        "Realized Gains/(Losses), Net,": "Unrealized MTM", "Unrealized Gains/(Losses), Net": "Professional Fees",\
+        "Other Expense": "Distributions", " Ending Balance": "Ending Equity Balance", "total": "Total"
         }
         #{"Total Contributions": "Contributions", "Total Distributions": "Ordinary Income",\
         #"Realized Gain/(Loss)": "Unrealized MTM", "Professional Fees": "Realized Gain/Loss",\
         #"Other Expenses": "Distributions", "Change in Unrealized": "Ending Equity Balance"
         #}
-}
+    }
 
+    #=================
+    #    WINGSTOP
+    #=================
 
-    tgi_column = ['Commitment Percentage','Commitment Amount','Beginning Balance','Contributions','Distributions',\
-                   'Realized Gains (Losses), Net','Unrealized Gains (Losses), Net','Management Fee, Net','Other Income',\
-                  'Other Expense','Transfers','Asset Transfer','Ending Balance']
-    
-    tgi_pg_head = 'Your Share - Inception to Date'
-    tgi_pg_end = 'Page'
-    tgi_tble_head = 'Total'
-    tgi_tble_end = 'Page'
-    tgi_keywords = ['Total Contributions','Total Distributions','Realized Gain/(Loss)','Other Expenses',\
-                     'Change in Unrealized','Idle Funds Interest Income','Equity Transfer','12/31/2017 Closing Equity']
-    
-    # initializing pdf object
-    TGI = PDF(tgi_column, tgi_pg_head, tgi_pg_end, tgi_tble_head, tgi_tble_end, tgi_keywords)
-
-    tgi_df = PDFparser.create_df(pdf_content, TGI.page_pattern, TGI.content_pattern, TGI.column)
-    print(tgi_df)
-    '''
-    
-    # windpoint
-    get_data = {
+    wingstop_feed = {
     "format": {
         "Company_ID": 2,
-        "Begin_of_Page_Text": "The Northwestern Mutual Life I",
+        "Begin_of_Page_Text": "Statement of Partners' Capital",
+        #"Begin_of_Page_Text": "The Northwestern Mutual Life I",
         "End_of_Page_Text": "CONFIDENTIAL & PROPRIETARY",
         "End_of_Table_Text": "CONFIDENTIAL & PROPRIETARY",
         "Begin_of_Table_Text": "The Northwestern Mutual Life I",
@@ -260,31 +282,11 @@ def main():
         "The Northwestern Mutual Life Insurance Company": "The Northwestern Mutual Life Insurance Company",
     }
 }
-
-
-    # initializing pdf object & set parameters
-    pdf_object = PDF()
-    pdf_object.set_properties(get_data)
-    
-    # parsing pdf
-    pdf_content = PDFparser().parse(input_path)
-    
-    # building dataframe
-    df = PDFparser().create_df(pdf_content, pdf_object.page_pattern, pdf_object.content_pattern, pdf_object.column)
-
-    new_col_header, col_for_calc, row_for_calc = col_check(pdf_object.keywords, pdf_object.column)
-
-    # renaming column to stripped whitespace
-    df.columns = new_col_header
-
-    # prep df for calculation (removing columns unecessary for calculation)
-    df = prep_df(df, col_for_calc, row_for_calc)
-    calc(df)
-    # calculating ordinary income
-    #calculate(df, pdf_object.column, pdf_object.keywords, pdf_object.filter, pdf_object.transpose)
-
+    # pass pdf off to parse & perform calculations
+    process_pdf(input_path, wingstop_feed)
 
 if __name__ == "__main__":
     main()
 else:
     print("script.py is being imported into another module")
+    print()
