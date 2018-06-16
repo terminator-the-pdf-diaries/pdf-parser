@@ -174,7 +174,9 @@ def main():
 
     #input_path = "./data/Arby/40721_Arby_Bottom_2017-12-31.pdf"
     #input_path = "./data/TGIFriday/20044_TGI_Friday_Nose danger track_2017-12-31.pdf"
-    input_path = "./data/WingStop/new_65008_WingStop_Half here talk_2017-12-31.pdf"
+    
+    # use 65008 for updated wingstop format
+    input_path = "./data/WingStop/65008_WingStop_Half here talk_2017-12-31.pdf"
 
     #=================
     #      ARBY

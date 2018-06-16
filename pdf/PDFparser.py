@@ -48,13 +48,8 @@ class PDFparser:
         pdf = pdf.replace('\n\n', '\n').replace(
             'Gain/(Loss)', 'GainLoss').replace('46_1274', '')  # .replace('/', '')
         return pdf
-<<<<<<< HEAD
     
     def create_df(self, pdf_content, page_pattern, table_pattern, column_headings, line_pattern = r'([a-z, ]+)([%,$,\(,\), \., 0-9 -]+)'):
-=======
-
-    def create_df(self, pdf_content, page_pattern, content_pattern, column_headings, line_pattern=r'([a-z, ]+)([%,$,\(,\), \., 0-9 -]+)'):
->>>>>>> 3f746ac759a6ad84934537c2bf0ae80b3a8020d4
         """Create a Pandas DataFrame from lines of text in a PDF.
 
         Arguments:
@@ -75,14 +70,9 @@ class PDFparser:
         print()
 
         # group 0 - inclusive
-<<<<<<< HEAD
         content_match = re.search(table_pattern, page_match.group(0), re.DOTALL)
         print('CONTENT MATCH', content_match)
         print()
-=======
-        content_match = re.search(
-            content_pattern, page_match.group(0), re.DOTALL)
->>>>>>> 3f746ac759a6ad84934537c2bf0ae80b3a8020d4
         content_match = content_match.group(0)
 
         print('TABLE MATCH GROUP 0')
@@ -127,7 +117,4 @@ if __name__ == "__main__":
     pass
 else:
     print("pdfparser.py is being imported into another module")
-<<<<<<< HEAD
     print()
-=======
->>>>>>> 3f746ac759a6ad84934537c2bf0ae80b3a8020d4

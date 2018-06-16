@@ -20,14 +20,8 @@ class PDF:
         self.table_head = None
         self.table_end = None
 
-<<<<<<< HEAD
         self.keywords = None # keywords filtered for calculations
         
-=======
-        self.keywords = None  # keywords filtered for calculations
-        self.filter = None
-
->>>>>>> 3f746ac759a6ad84934537c2bf0ae80b3a8020d4
         self.page_pattern = None
         self.table_pattern = None
 
@@ -49,7 +43,6 @@ class PDF:
         self.pg_end = json['format']['End_of_Page_Text']
         self.table_head = json['format']['Begin_of_Table_Text']
         self.table_end = json['format']['End_of_Table_Text']
-<<<<<<< HEAD
 
         '''
         this process to be done in api
@@ -75,23 +68,9 @@ class PDF:
         
         self.table_pattern = PDFparser().gen_regex(self.table_head, self.table_end, True)
         print('TABLE PATTERN: ', self.table_pattern)
-=======
-        self.transpose = json['format']['Transpose']
-        self.column = json['headers']
-        self.keywords = self.strip_json(json['keyword_match'])
-        self.filter = json['excluded_headers']
-
-        self.page_pattern = PDFparser().gen_regex(self.pg_head, self.pg_end, False)
-        self.content_pattern = PDFparser().gen_regex(
-            self.table_head, self.table_end, True)
-
->>>>>>> 3f746ac759a6ad84934537c2bf0ae80b3a8020d4
 
 if __name__ == "__main__":
     pass
 else:
     print("pdf.py is being imported into another module")
-<<<<<<< HEAD
     print()
-=======
->>>>>>> 3f746ac759a6ad84934537c2bf0ae80b3a8020d4
