@@ -1,3 +1,5 @@
 {
-  "python.pythonPath": "/Users/zha5993/anaconda3/bin/python"
+  "python.pythonPath": "/Users/GOO7387/anaconda3/bin/python",
+  "python.formatting.provider": "autopep8",
+  "python.linting.pylintEnabled": false
 }

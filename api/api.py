@@ -1,13 +1,19 @@
 
+import sys
+import os
+
 from flask import Flask, request, Response
 from flask_restful import Resource, Api
 from json import dumps
 from flask_jsonpify import jsonify
+import json
 from flask_cors import CORS
 from database import database
 from s3 import upload_file_to_s3
 from config import S3_LOCATION, S3_KEY, S3_SECRET, S3_BUCKET
-from tika import parser
+sys.path.append(os.path.abspath('../pdf-parser/parser'))
+import script
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.config['CORS_HEADERS'] = ['Content-Type']
@@ -53,24 +59,6 @@ class Rule_Helper:
         result = []
         sql = self.query("Column_Header_Text",
                          "Financial_Statement_Column_Header")
-        cur.execute(sql)
-        data_set = cur.fetchall()
-        for row in data_set:
-            result.append(row["Column_Header_Text"])
-        return result
-
-    def get_excluded_headers(self):
-        result = []
-        if (self._company_id is None):
-            sql = """SELECT Column_Header_Text
-            FROM Financial_Statement_Column_Header C
-            WHERE C.Discard_Column = True
-            """
-        else:
-            sql = """SELECT Column_Header_Text
-            FROM Financial_Statement_Column_Header C
-            WHERE C.Discard_Column = True AND C.Company_ID = %s
-            """ % (self._company_id)
         cur.execute(sql)
         data_set = cur.fetchall()
         for row in data_set:
@@ -125,8 +113,6 @@ class Rules(Resource):
                 _rules[attr] = value
 
             _rules["headers"] = Rule_Helper(_id).get_column_headers()
-            _rules["excluded_header"] = Rule_Helper(
-                _id).get_excluded_headers()
             _rules["keyword_match"] = Helpers.convert_list_to_dic(
                 Rule_Helper(_id).get_keyword_match())
 
@@ -143,13 +129,11 @@ class Rule(Resource):
     def get(self, id):
         _format = Rule_Helper(id).get_format()
         _headers = Rule_Helper(id).get_column_headers()
-        _excluded_headers = Rule_Helper(id).get_excluded_headers()
         _keyword_match = Helpers.convert_list_to_dic(
             Rule_Helper(id).get_keyword_match())
         result = {
             "format": _format,
             "headers": _headers,
-            "excluded_headers": _excluded_headers,
             "keyword_match": _keyword_match
         }
         return result
@@ -191,29 +175,33 @@ class Transaction(Resource):
             result[_IA_text] = float(row["Accounting_Transaction_Amount"])
         return result
 
+    def post(self, data):
+        return data
+
 
 class Upload(Resource):
     def post(self):
-        file = request.files["files"]
+        files = request.files.getlist("files[]")
+        print(request.files.keys())
+        for file in files:
+            print("counttt")
+            filename = secure_filename(file.filename)
+            self.process_file(file, filename)
 
-        print(self.get_rules(file.filename))
-
+    def process_file(self, file, name):
         # Save S3 Link
-        output = upload_file_to_s3(file, app.config["S3_BUCKET"])
+        # output = upload_file_to_s3(file, app.config["S3_BUCKET"])
 
-        _id = self.get_company_id(self.get_file_business_unit(file.filename))
-        self.save_s3_link(output, _id)
+        _id = self.get_company_id(
+            self.get_file_business_unit(name))
+        # self.save_s3_link(output, _id)
 
         # Save Final Transaction
-        # Replace with conver data method
-        # Use Tika to parse the PDF
-        parsedPDF = parser.from_buffer(file.read())
-        print('pdf', parsedPDF["content"])
-        # calculated_data = {"data": "data"}
-        # self.save_final_transaction(calculated_data, _id)
-        calculated_data = Transaction().get(_id)
-        print("calculated", calculated_data)
-        return calculated_data
+        result = script.process_pdf(
+            file.read(), self.get_rules(name))
+        print('result!!!!!!!!!', result)
+
+        return result
 
     def options(self):
         resp = Response()
@@ -223,12 +211,13 @@ class Upload(Resource):
         return resp
 
     def get_company_id(self, business_unit):
-        sql = """SELECT Company_ID FROM Company WHERE Business_Unit_Num = %s""" % (
+        sql = """SELECT company_id FROM Business_Unit WHERE value = %s""" % (
             business_unit)
         cur.execute(sql)
-        return cur.fetchone()["Company_ID"]
+        return cur.fetchone()["company_id"]
 
     def get_file_business_unit(self, name):
+        print('business unit', name.split("_")[0])
         return name.split("_")[0]
 
     def get_rules(self, name):
