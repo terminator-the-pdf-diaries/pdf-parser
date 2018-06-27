@@ -27,28 +27,35 @@ def calc(df):
     # 1 x n = sum by row
 
     print(df.shape)
-    print()
 
     # n x 1
     if (df.shape[0] > 1 and df.shape[1] == 1):
         print('DF IS: SERIES SHAPE')
 
-        # adding calculated value to df
-        df.loc['calculated_result'] = df.sum()
-
     # 1 x n
     elif (df.shape[0] == 1 and df.shape[1] > 1):
         print('DF IS: ARRAY SHAPE')
-
-        df['calculated_result'] = df[df.columns].sum(axis=1)
+        print('DF BEFORE TRANSPOSE\n')
+        print(df)
 
         # transposing
         df = df.T
 
     print()
-    print('END RESULT')
+    print('DF FOR CALCULATION:')
+    print(df) 
+    print()   
+    
+    # calculation by buckets
+    df['IA_Classification'] = df.index
+    df.index = pd.RangeIndex(len(df.index))  
+    df = df.groupby('IA_Classification').sum()
+
+    # reseting index
+    df['IA_Classification'] = df.index
+    df.index = pd.RangeIndex(len(df.index))  
+
     print(df)
-    print()
     return df
 
 
@@ -158,7 +165,7 @@ def process_df(pdf_object, df):
 
     # prep df for calculation (removing columns unecessary for calculation)
     df = prep_df(df, col_keywords, row_keywords)
-    df = calc(df)
+    # df = calc(df)
 
     print('DF INDEX: ', df.index)
     print('DF COLUMNS: ', df.columns)
@@ -167,9 +174,9 @@ def process_df(pdf_object, df):
     # renaming to match IA classification before sending to DB
     df.index = rename(df.index, pdf_object.keywords)
     df.columns = rename(df.columns, pdf_object.keywords)
-    df['IA_Classification'] = df.index
-    df.index = pd.RangeIndex(len(df.index))
+    df = calc(df)
 
+    print('END RESULT')
     print(df)
     return send(df)
 
@@ -200,11 +207,11 @@ def process_pdf(input_path, db_feed):
 
 def main():
 
-    input_path = "./data/Arby/46286_Arby_Fed_2017-12-31.pdf"
+    #input_path = "./data/Arby/46286_Arby_Fed_2017-12-31.pdf"
     #input_path = "./data/TGIFriday/20044_TGI_Friday_Nose danger track_2017-12-31.pdf"
 
     # use 65008 for updated wingstop format
-    #input_path = "./data/WingStop/65008_WingStop_Half here talk_2017-12-31.pdf"
+    input_path = "./data/WingStop/65008_WingStop_Half here talk_2017-12-31.pdf"
 
     #=================
     #      ARBY
@@ -212,26 +219,28 @@ def main():
 
     arby_feed = {
         "format": {
-            "Begin_of_Page_Text": "For the Year",
-            "Begin_of_Table_Text": "Opening Equity",
             "Company_ID": 1,
+            "Begin_of_Page_Text": "For the Year",
             "End_of_Page_Text": "Proprietary Confidential Business Information",
-            "End_of_Table_Text": "Remaining Commitment"
+            "End_of_Table_Text": "Remaining Commitment",
+            "Begin_of_Table_Text": "Opening Equity"
         },
-        "headers": ["Category", "Total Fund", "Investor's Allocation"],
-        "keyword_match":
-        {"Total Contributions": "Contributions",
-         "Total Distributions": "Distributions",
-         "Realized Gain/(Loss)": "Realized Gain/Loss",
-         "Professional Fees": "Ordinary Income",
-         "Other Expenses": "Ordinary Income",
-         "Change in Unrealized": "Unrealized MTM",
-         "Idle Funds Interest Income": "Ordinary Income",
-         "Equity Transfer": "Ordinary Income",
-         "Closing Equity": "Ending Equity Balance",
-         "Investor's Allocation": "Allocation"},
-        "calculation_rules": {
-            'TBD': ''
+        "headers": [
+            "Category",
+            "Total Fund",
+            "Investor's Allocation"
+        ],
+        "keyword_match": {
+            "Total Contributions": "Contributions",
+            "Total Distributions": "Distributions",
+            "Realized Gain/(Loss)": "Realized Gain/Loss",
+            "Professional Fees": "Ordinary Income",
+            "Other Expenses": "Ordinary Income",
+            "Change in Unrealized": "Unrealized MTM",
+            "Idle Funds Interest Income": "Ordinary Income",
+            "Equity Transfer": "Ordinary Income",
+            "Closing Equity": "Ending Equity Balance",
+            "Investor's Allocation": "Amount"
         }
     }
 
@@ -241,36 +250,38 @@ def main():
 
     tgi_feed = {
         "format": {
+            "Company_ID": 3,
             "Begin_of_Page_Text": "Inception to Date",
-            "Begin_of_Table_Text": "Total",
-            "Company_ID": 2,
             "End_of_Page_Text": "Page",
-            "End_of_Table_Text": "Page"
+            "End_of_Table_Text": "Page",
+            "Begin_of_Table_Text": "Total"
         },
-        "headers": ['Commitment Percentage',
-                    'Commitment Amount',
-                    'Beginning Balance',
-                    'Contributions',
-                    'Distributions',
-                    'Realized Gains (Losses), Net',
-                    'Unrealized Gains (Losses), Net',
-                    'Management Fee, Net',
-                    'Other Income',
-                    'Other Expense',
-                    'Transfers',
-                    'Asset Transfer',
-                    'Ending Balance'],
+        "headers": [
+            "Commitment Percentage",
+            "Commitment Amount",
+            "Beginning Balance",
+            "Contributions",
+            "Distributions",
+            "Realized Gains (Losses), Net",
+            "Unrealized Gains (Losses), Net",
+            "Management Fee, Net",
+            "Other Income",
+            "Other Expense",
+            "Transfers",
+            "Asset Transfer",
+            "Ending Balance"
+        ],
         "keyword_match": {
-            "Contributions": "Contributions", 
-            "Distributions": "Ordinary Income",
-            "Realized Gains/(Losses), Net,": "Unrealized MTM", 
-            "Unrealized Gains/(Losses), Net": "Professional Fees",
-            "Other Expense": "Distributions", " Ending Balance": "Ending Equity Balance", "total": "Total"
+            "Contributions": "Contributions",
+            "Distributions": "Distributions",
+            "Realized Gains (Losses), Net": "Realized Gain/Loss",
+            "Unrealized Gains (Losses), Net": "Unrealized MTM",
+            "Management Fee, Net": "Ordinary Income",
+            "Other Income": "Ordinary Income",
+            "Other Expense": "Ordinary Income",
+            "total": "Amount",
+            "Ending Balance": "Ending Equity Balance"
         }
-        #{"Total Contributions": "Contributions", "Total Distributions": "Ordinary Income",\
-        #"Realized Gain/(Loss)": "Unrealized MTM", "Professional Fees": "Realized Gain/Loss",\
-        #"Other Expenses": "Distributions", "Change in Unrealized": "Ending Equity Balance"
-        #}
     }
 
     #=================
@@ -281,37 +292,35 @@ def main():
         "format": {
             "Company_ID": 2,
             "Begin_of_Page_Text": "Statement of Partners' Capital",
-            #"Begin_of_Page_Text": "The Northwestern Mutual Life I",
             "End_of_Page_Text": "CONFIDENTIAL & PROPRIETARY",
             "End_of_Table_Text": "CONFIDENTIAL & PROPRIETARY",
-            "Begin_of_Table_Text": "The Northwestern Mutual Life I",
+            "Begin_of_Table_Text": "The Northwestern Mutual Life I"
         },
         "headers": [
             "Company Name",
             "Capital Contribution percentage",
             "Partner's capital commitments",
-            #"Funded capital commitments",
             "Recall provision receivable",
             "Cumulative distributions",
             "Cumulative gain allocations",
-            "Net gain before investment gain",
+            "Net gain before Investment gain",
             "Net gain on investments unrealized",
             "Net gain on investments realized",
             "Distributions",
-            "Total partners' capital"],
+            "Total partners' capital"
+        ],
         "keyword_match": {
-            #"Contributions": "Contributions",
             "Net gain before investment gain": "Ordinary Income",
             "Net gain on investments unrealized": "Unrealized MTM",
             "Net gain on investments realized": "Realized Gain/Loss",
             "Distributions": "Distributions",
             "Total partners' capital": "Ending Equity Balance",
-            "The Northwestern Mutual Life Insurance Company": "The Northwestern Mutual Life Insurance Company",
+            "The Northwestern Mutual Life Insurance Company": "Amount"
         }
     }
 
     # pass pdf off to parse & perform calculations
-    process_pdf(input_path, arby_feed)
+    process_pdf(input_path, wingstop_feed)
 
 
 if __name__ == "__main__":

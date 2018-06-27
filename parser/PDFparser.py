@@ -36,15 +36,13 @@ class PDFparser:
         Tika library to parse PDF
         '''
 
+        # test
+        #parsedPDF = parser.from_file(string)
+
         parsedPDF = parser.from_buffer(string)
 
         # Extract the text content from the parsed PDF
         pdf = parsedPDF["content"]
-        # check - to be implemented
-        # dump parse to file, output dump to new terminal
-        #print('PARSE DUMP')
-        # print()
-        # print(pdf)
 
         # Convert double newlines into single newlines
         pdf = pdf.replace('\n\n', '\n').replace(
